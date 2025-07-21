@@ -8,13 +8,15 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { authService, ApiError } from '@/services/authService';
+import { SignInRequest } from '@/types/auth';
 
 interface FormData {
   email: string;
@@ -24,6 +26,7 @@ interface FormData {
 interface FormErrors {
   email?: string;
   password?: string;
+  general?: string;
 }
 
 export default function SignIn() {
@@ -41,17 +44,15 @@ export default function SignIn() {
     const newErrors: FormErrors = {};
 
     // Email validation
-    if (!formData.email) {
+    if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = 'Please provide a valid email';
     }
 
     // Password validation
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
     }
 
     setErrors(newErrors);
@@ -62,16 +63,57 @@ export default function SignIn() {
     if (!validateForm()) return;
 
     setLoading(true);
+    setErrors({});
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const credentials: SignInRequest = {
+        email: formData.email.trim(),
+        password: formData.password,
+      };
+
+      const response = await authService.signIn(credentials);
       
-      // TODO: Implement actual sign in logic here
-      Alert.alert('Success', 'Sign in successful!', [
-        { text: 'OK', onPress: () => router.replace('/(tabs)') }
-      ]);
+      // Success - navigate to main app
+      Alert.alert(
+        'Welcome Back!', 
+        `Hello ${response.user.name}, you've signed in successfully!`,
+        [
+          { 
+            text: 'Continue', 
+            onPress: () => router.replace('/(tabs)') 
+          }
+        ]
+      );
     } catch (error) {
-      Alert.alert('Error', 'Sign in failed. Please try again.');
+      console.error('Sign in error:', error);
+      
+      if (error instanceof ApiError) {
+        // Handle validation errors
+        if (error.errors && Array.isArray(error.errors)) {
+          const newErrors: FormErrors = {};
+          error.errors.forEach((err: any) => {
+            if (err.path === 'email') {
+              newErrors.email = err.msg;
+            } else if (err.path === 'password') {
+              newErrors.password = err.msg;
+            }
+          });
+          setErrors(newErrors);
+        } else {
+          // Handle general API errors
+          if (error.status === 401) {
+            setErrors({ general: 'Invalid email or password' });
+          } else if (error.status === 0) {
+            setErrors({ general: 'Network error. Please check your connection and try again.' });
+          } else if (error.status === 408) {
+            setErrors({ general: 'Request timeout. Please try again.' });
+          } else {
+            setErrors({ general: error.message || 'Sign in failed. Please try again.' });
+          }
+        }
+      } else {
+        setErrors({ general: 'An unexpected error occurred. Please try again.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -79,9 +121,12 @@ export default function SignIn() {
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
+    // Clear errors when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+    if (errors.general) {
+      setErrors(prev => ({ ...prev, general: undefined }));
     }
   };
 
@@ -109,6 +154,15 @@ export default function SignIn() {
 
             {/* Form */}
             <View style={styles.form}>
+              {/* General Error Message */}
+              {errors.general && (
+                <View style={styles.generalErrorContainer}>
+                  <ThemedText style={styles.generalErrorText}>
+                    {errors.general}
+                  </ThemedText>
+                </View>
+              )}
+
               <Input
                 label="Email Address"
                 placeholder="Enter your email"
@@ -119,6 +173,7 @@ export default function SignIn() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
+                editable={!loading}
               />
 
               <Input
@@ -131,10 +186,14 @@ export default function SignIn() {
                 rightIcon={showPassword ? "eye-outline" : "eye-off-outline"}
                 onRightIconPress={() => setShowPassword(!showPassword)}
                 secureTextEntry={!showPassword}
-                autoComplete="password"
+                autoComplete="current-password"
+                editable={!loading}
               />
 
-              <TouchableOpacity style={styles.forgotPassword}>
+              <TouchableOpacity 
+                style={styles.forgotPassword}
+                disabled={loading}
+              >
                 <ThemedText style={[styles.forgotPasswordText, { color: tintColor }]}>
                   Forgot Password?
                 </ThemedText>
@@ -154,7 +213,10 @@ export default function SignIn() {
             <View style={styles.footer}>
               <ThemedText style={styles.footerText}>
                 Don&apos;t have an account?{' '}
-                <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+                <TouchableOpacity 
+                  onPress={() => router.push('/(auth)/signup')}
+                  disabled={loading}
+                >
                   <ThemedText style={[styles.linkText, { color: tintColor }]}>
                     Sign Up
                   </ThemedText>
@@ -199,6 +261,19 @@ const styles = StyleSheet.create({
   form: {
     flex: 1,
     justifyContent: 'center',
+  },
+  generalErrorContainer: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  generalErrorText: {
+    color: '#DC2626',
+    fontSize: 14,
+    textAlign: 'center',
   },
   forgotPassword: {
     alignSelf: 'flex-end',

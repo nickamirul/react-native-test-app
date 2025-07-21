@@ -8,13 +8,15 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { authService, ApiError } from '@/services/authService';
+import { SignUpRequest } from '@/types/auth';
 
 interface FormData {
   fullName: string;
@@ -28,6 +30,7 @@ interface FormErrors {
   email?: string;
   password?: string;
   confirmPassword?: string;
+  general?: string;
 }
 
 export default function SignUp() {
@@ -47,27 +50,29 @@ export default function SignUp() {
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
-    // Full name validation
+    // Full name validation (backend expects 'name', min 2, max 50 chars)
     if (!formData.fullName.trim()) {
-      newErrors.fullName = 'Full name is required';
+      newErrors.fullName = 'Name is required';
     } else if (formData.fullName.trim().length < 2) {
-      newErrors.fullName = 'Full name must be at least 2 characters';
+      newErrors.fullName = 'Name must be at least 2 characters';
+    } else if (formData.fullName.trim().length > 50) {
+      newErrors.fullName = 'Name must be no more than 50 characters';
     }
 
     // Email validation
-    if (!formData.email) {
+    if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = 'Please provide a valid email';
     }
 
-    // Password validation
+    // Password validation (backend expects min 6 chars with uppercase, lowercase, and number)
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters long';
     } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = 'Password must contain uppercase, lowercase, and number';
+      newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
     }
 
     // Confirm password validation
@@ -85,20 +90,60 @@ export default function SignUp() {
     if (!validateForm()) return;
 
     setLoading(true);
+    setErrors({});
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const userData: SignUpRequest = {
+        name: formData.fullName.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+      };
+
+      const response = await authService.signUp(userData);
       
-      // TODO: Implement actual sign up logic here
+      // Success - show welcome message and navigate to main app
       Alert.alert(
-        'Success', 
-        'Account created successfully! Please check your email for verification.',
+        'Welcome!', 
+        `Hello ${response.user.name}! Your account has been created successfully.`,
         [
-          { text: 'OK', onPress: () => router.replace('/(auth)/signin') }
+          { 
+            text: 'Continue', 
+            onPress: () => router.replace('/(tabs)') 
+          }
         ]
       );
     } catch (error) {
-      Alert.alert('Error', 'Sign up failed. Please try again.');
+      console.error('Sign up error:', error);
+      
+      if (error instanceof ApiError) {
+        // Handle validation errors
+        if (error.errors && Array.isArray(error.errors)) {
+          const newErrors: FormErrors = {};
+          error.errors.forEach((err: any) => {
+            if (err.path === 'name') {
+              newErrors.fullName = err.msg;
+            } else if (err.path === 'email') {
+              newErrors.email = err.msg;
+            } else if (err.path === 'password') {
+              newErrors.password = err.msg;
+            }
+          });
+          setErrors(newErrors);
+        } else {
+          // Handle general API errors
+          if (error.status === 400 && error.message.includes('already exists')) {
+            setErrors({ email: 'An account with this email already exists' });
+          } else if (error.status === 0) {
+            setErrors({ general: 'Network error. Please check your connection and try again.' });
+          } else if (error.status === 408) {
+            setErrors({ general: 'Request timeout. Please try again.' });
+          } else {
+            setErrors({ general: error.message || 'Sign up failed. Please try again.' });
+          }
+        }
+      } else {
+        setErrors({ general: 'An unexpected error occurred. Please try again.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -106,9 +151,12 @@ export default function SignUp() {
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
+    // Clear errors when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+    if (errors.general) {
+      setErrors(prev => ({ ...prev, general: undefined }));
     }
   };
 
@@ -136,6 +184,15 @@ export default function SignUp() {
 
             {/* Form */}
             <View style={styles.form}>
+              {/* General Error Message */}
+              {errors.general && (
+                <View style={styles.generalErrorContainer}>
+                  <ThemedText style={styles.generalErrorText}>
+                    {errors.general}
+                  </ThemedText>
+                </View>
+              )}
+
               <Input
                 label="Full Name"
                 placeholder="Enter your full name"
@@ -145,6 +202,7 @@ export default function SignUp() {
                 icon="person-outline"
                 autoCapitalize="words"
                 autoComplete="name"
+                editable={!loading}
               />
 
               <Input
@@ -157,6 +215,7 @@ export default function SignUp() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
+                editable={!loading}
               />
 
               <Input
@@ -170,6 +229,7 @@ export default function SignUp() {
                 onRightIconPress={() => setShowPassword(!showPassword)}
                 secureTextEntry={!showPassword}
                 autoComplete="new-password"
+                editable={!loading}
               />
 
               <Input
@@ -183,6 +243,7 @@ export default function SignUp() {
                 onRightIconPress={() => setShowConfirmPassword(!showConfirmPassword)}
                 secureTextEntry={!showConfirmPassword}
                 autoComplete="new-password"
+                editable={!loading}
               />
 
               <Button
@@ -197,13 +258,13 @@ export default function SignUp() {
               {/* Terms */}
               <ThemedText style={[styles.termsText, { color: useThemeColor({}, 'icon') }]}>
                 By creating an account, you agree to our{' '}
-                <TouchableOpacity>
+                <TouchableOpacity disabled={loading}>
                   <ThemedText style={[styles.linkText, { color: tintColor }]}>
                     Terms of Service
                   </ThemedText>
                 </TouchableOpacity>
                 {' '}and{' '}
-                <TouchableOpacity>
+                <TouchableOpacity disabled={loading}>
                   <ThemedText style={[styles.linkText, { color: tintColor }]}>
                     Privacy Policy
                   </ThemedText>
@@ -215,7 +276,10 @@ export default function SignUp() {
             <View style={styles.footer}>
               <ThemedText style={styles.footerText}>
                 Already have an account?{' '}
-                <TouchableOpacity onPress={() => router.push('/(auth)/signin')}>
+                <TouchableOpacity 
+                  onPress={() => router.push('/(auth)/signin')}
+                  disabled={loading}
+                >
                   <ThemedText style={[styles.linkText, { color: tintColor }]}>
                     Sign In
                   </ThemedText>
@@ -260,6 +324,19 @@ const styles = StyleSheet.create({
   form: {
     flex: 1,
     justifyContent: 'center',
+  },
+  generalErrorContainer: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  generalErrorText: {
+    color: '#DC2626',
+    fontSize: 14,
+    textAlign: 'center',
   },
   signUpButton: {
     marginTop: 8,

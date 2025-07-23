@@ -256,26 +256,34 @@ export default function SignUp() {
               />
 
               {/* Terms */}
-              <ThemedText style={[styles.termsText, { color: useThemeColor({}, 'icon') }]}>
-                By creating an account, you agree to our{' '}
-                <TouchableOpacity disabled={loading}>
-                  <ThemedText style={[styles.linkText, { color: tintColor }]}>
-                    Terms of Service
+              <View style={styles.termsContainer}>
+                <View style={styles.termsTextRow}>
+                  <ThemedText style={[styles.termsText, { color: useThemeColor({}, 'icon') }]}>
+                    By creating an account, you agree to our{' '}
                   </ThemedText>
-                </TouchableOpacity>
-                {' '}and{' '}
-                <TouchableOpacity disabled={loading}>
-                  <ThemedText style={[styles.linkText, { color: tintColor }]}>
-                    Privacy Policy
+                  <TouchableOpacity disabled={loading}>
+                    <ThemedText style={[styles.linkText, { color: tintColor }]}>
+                      Terms of Service
+                    </ThemedText>
+                  </TouchableOpacity>
+                  <ThemedText style={[styles.termsText, { color: useThemeColor({}, 'icon') }]}>
+                    {' '}and{' '}
                   </ThemedText>
-                </TouchableOpacity>
-              </ThemedText>
+                  <TouchableOpacity disabled={loading}>
+                    <ThemedText style={[styles.linkText, { color: tintColor }]}>
+                      Privacy Policy
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
 
             {/* Footer */}
             <View style={styles.footer}>
-              <ThemedText style={styles.footerText}>
-                Already have an account?{' '}
+              <View style={styles.footerTextContainer}>
+                <ThemedText style={styles.footerText}>
+                  Already have an account?{' '}
+                </ThemedText>
                 <TouchableOpacity 
                   onPress={() => router.push('/(auth)/signin')}
                   disabled={loading}
@@ -284,7 +292,7 @@ export default function SignUp() {
                     Sign In
                   </ThemedText>
                 </TouchableOpacity>
-              </ThemedText>
+              </View>
             </View>
           </ThemedView>
         </ScrollView>
@@ -342,15 +350,26 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 24,
   },
+  termsContainer: {
+    marginBottom: 24,
+  },
+  termsTextRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   termsText: {
     fontSize: 14,
-    textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 24,
   },
   footer: {
     alignItems: 'center',
     paddingTop: 24,
+  },
+  footerTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   footerText: {
     fontSize: 16,

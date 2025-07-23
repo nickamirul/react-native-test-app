@@ -211,8 +211,10 @@ export default function SignIn() {
 
             {/* Footer */}
             <View style={styles.footer}>
-              <ThemedText style={styles.footerText}>
-                Don&apos;t have an account?{' '}
+              <View style={styles.footerTextContainer}>
+                <ThemedText style={styles.footerText}>
+                  Don&apos;t have an account?{' '}
+                </ThemedText>
                 <TouchableOpacity 
                   onPress={() => router.push('/(auth)/signup')}
                   disabled={loading}
@@ -221,7 +223,7 @@ export default function SignIn() {
                     Sign Up
                   </ThemedText>
                 </TouchableOpacity>
-              </ThemedText>
+              </View>
             </View>
           </ThemedView>
         </ScrollView>
@@ -290,6 +292,10 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
     paddingTop: 24,
+  },
+  footerTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   footerText: {
     fontSize: 16,

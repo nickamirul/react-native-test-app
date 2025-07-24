@@ -3,7 +3,9 @@ import {
   SignInRequest, 
   SignUpRequest, 
   AuthResponse, 
-  ApiResponse 
+  ApiResponse,
+  UpdateProfileRequest,
+  ChangePasswordRequest
 } from '@/types/auth';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -150,6 +152,36 @@ class AuthService {
       method: 'GET',
       headers: await this.getAuthHeaders(),
     });
+  }
+
+  async updateProfile(profileData: UpdateProfileRequest) {
+    const authHeaders = await this.getAuthHeaders();
+    
+    const requestOptions = {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+      },
+      body: JSON.stringify(profileData),
+    };
+    
+    return this.makeRequest('/auth/profile', requestOptions);
+  }
+
+  async changePassword(passwordData: ChangePasswordRequest) {
+    const authHeaders = await this.getAuthHeaders();
+    
+    const requestOptions = {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+      },
+      body: JSON.stringify(passwordData),
+    };
+    
+    return this.makeRequest('/auth/change-password', requestOptions);
   }
 
   async isAuthenticated(): Promise<boolean> {

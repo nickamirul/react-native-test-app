@@ -9,6 +9,15 @@ export interface SignUpRequest {
   password: string;
 }
 
+export interface UpdateProfileRequest {
+  name?: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface User {
   id: string;
   name: string;
